@@ -1,6 +1,23 @@
 package com.company;
 
+import javax.swing.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+class Outer
+{
+    static int x;
+    static class Inner{
+        void foo()
+        {
+            Outer.x = 8;
+        }
+    }
+}
 
 class SharedObject{
     public static List<String> list = Collections.synchronizedList(new ArrayList<String>());
@@ -8,9 +25,19 @@ class SharedObject{
 
 class ListAdder extends Thread
 {
+    ListAdder(String name)
+    {
+        this.name = name;
+    }
     static Object lock = new Object();
     static int count = 0;
-    static final int MAX_COUNT = 1_000_000;
+    static final int MAX_COUNT = 10;
+    private String name;
+
+    public ListAdder() {
+
+    }
+
     @Override
     public void run()
     {
@@ -19,6 +46,14 @@ class ListAdder extends Thread
             // synchronized ( lock )
             {
                 SharedObject.list.add(i+"");
+                System.out.printf( "%10s %10d : %10d%n",
+                        name, Thread.currentThread().getId(), i);
+                try {
+                    Thread.sleep( (int) (Math.random()* 5));
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                // System.out.println(i);
             }
         }
     }
@@ -85,7 +120,80 @@ class MyArrayList<T> {
 }
 
 public class Main {
+    static JButton button;
+    static ExecutorService ex;
     public static void main(String[] args) {
+        JFrame app = new JFrame();
+        app.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+        app.setSize(500,500);
+        button = new JButton("Press Me");
+        app.add(button);
+
+        ex = Executors.newFixedThreadPool(4);
+
+
+        button.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                Runnable runnable = new Runnable() {
+                    @Override
+                    public void run() {
+                        slowTask();
+                    }
+                };
+                ex.execute(runnable);
+            }
+        });
+
+        app.setVisible(true);
+    }
+
+    private static void  slowTask() {
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                if (((ThreadPoolExecutor) ex).getActiveCount() >= 1)
+                button.setText("Started");
+            }
+        });
+
+
+        for (int i=0;i<1_000_000;i++)
+        {
+            System.out.println(i);
+        }
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                if (((ThreadPoolExecutor) ex).getActiveCount() < 1)
+                    button.setText("Completed");
+            }
+        });
+    }
+
+    public static void main3(String[] args) {
+        final int MaxRunnables = 5;
+        ExecutorService ex = Executors.newFixedThreadPool(4);
+        for (int i = 0; i < MaxRunnables; i++) {
+            Runnable runnable1 = new ListAdder("" + (char)('A' + i) );
+            ex.execute(runnable1);
+        }
+        ex.shutdown();
+//        try {
+//            ex.awaitTermination(5, TimeUnit.MINUTES);
+//        } catch (InterruptedException e) {
+//            e.printStackTrace();
+//        }
+        while (! ex.isTerminated()) {
+        try{
+            Thread.sleep(100);
+        }catch (Exception e){}
+        }
+
+        System.out.println(SharedObject.list.size());
+    }
+
+    public static void main2(String[] args) {
 
         Runnable runnable1 = new ListAdder();
         Thread thread1 = new Thread(runnable1);

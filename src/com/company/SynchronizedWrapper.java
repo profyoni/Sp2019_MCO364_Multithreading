@@ -51,7 +51,7 @@ public class SynchronizedWrapper<T> implements List<T>
 
     @Override
     public boolean remove(Object o) {
-        throw new ;
+      return true;
     }
 
     @Override
